@@ -2,6 +2,7 @@ package bid_usecase
 
 import (
 	"context"
+	"fmt"
 	"fullcycle-auction_go/configuration/logger"
 	"fullcycle-auction_go/internal/entity/bid_entity"
 	"fullcycle-auction_go/internal/internal_error"
@@ -71,16 +72,18 @@ func (bu *BidUseCase) triggerCreateRoutine(ctx context.Context) {
 		for {
 			select {
 			case bidEntity, ok := <-bu.bidChannel:
+				// if the channel is closed, we need to check if there are any bids left in the batch
 				if !ok {
 					if len(bidBatch) > 0 {
 						if err := bu.BidRepository.CreateBid(ctx, bidBatch); err != nil {
-							logger.Error("error trying to process bid batch list", err)
+							logger.Error("error trying to process remaining items bid batch list", err)
 						}
 					}
 					return
 				}
 
 				bidBatch = append(bidBatch, bidEntity)
+				fmt.Println("add bid to batch ", bidEntity)
 
 				if len(bidBatch) >= bu.maxBatchSize {
 					if err := bu.BidRepository.CreateBid(ctx, bidBatch); err != nil {
@@ -110,6 +113,7 @@ func (bu *BidUseCase) CreateBid(
 		return err
 	}
 
+	fmt.Println("create bid usecase", bidEntity)
 	bu.bidChannel <- *bidEntity
 
 	return nil

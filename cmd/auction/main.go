@@ -16,6 +16,7 @@ import (
 	"github.com/joho/godotenv"
 	"go.mongodb.org/mongo-driver/mongo"
 	"log"
+	"sync"
 )
 
 func main() {
@@ -52,8 +53,11 @@ func initDependencies(database *mongo.Database) (
 	bidController *bid_controller.BidController,
 	auctionController *auction_controller.AuctionController) {
 
-	auctionRepository := auction.NewAuctionRepository(database)
-	bidRepository := bid.NewBidRepository(database, auctionRepository)
+	// We create a mutex to control the access to the auction status so when the status is being updated we guarantee
+	// that no other operation is being executed
+	auctionStatusMutex := &sync.Mutex{}
+	auctionRepository := auction.NewAuctionRepository(database, auctionStatusMutex)
+	bidRepository := bid.NewBidRepository(database, auctionRepository, auctionStatusMutex)
 	userRepository := user.NewUserRepository(database)
 
 	userController = user_controller.NewUserController(

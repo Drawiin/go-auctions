@@ -1,0 +1,57 @@
+@auctionId = a96cb7e7-2223-4d80-b1c6-3a01c3d62991
+@userId = 17e1f14c-c1e3-49a5-a87a-4aff46e839ab
+
+### Get auction by ID
+GET http://localhost:8080/auction/{{auctionId}}
+Accept: application/json
+
+###
+
+### Create a new auction
+POST http://localhost:8080/auction
+Content-Type: application/json
+
+{
+  "product_name": "Test Product7",
+  "category": "Test Category",
+  "description": "Test Description",
+  "condition": 1
+}
+
+### Get all auctions
+GET http://localhost:8080/auction?status=0
+Accept: application/json
+
+### Create a new bid
+POST http://localhost:8080/bid
+Content-Type: application/json
+
+{
+  "auction_id": "{{auctionId}}",
+  "user_id": "{{userId}}",
+  "amount": 105
+}
+
+
+
+###
+
+### Get winning bid by auction ID
+GET http://localhost:8080/auction/winner/{{auctionId}}
+Accept: application/json
+
+###
+
+
+
+###
+
+### Get bids by auction ID
+GET http://localhost:8080/bid/{{auctionId}}
+Accept: application/json
+
+###
+
+### Get user by ID
+GET http://localhost:8080/user/{{userId}}
+Accept: application/json

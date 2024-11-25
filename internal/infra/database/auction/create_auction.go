@@ -2,9 +2,13 @@ package auction
 
 import (
 	"context"
+	"fmt"
 	"fullcycle-auction_go/configuration/logger"
 	"fullcycle-auction_go/internal/entity/auction_entity"
 	"fullcycle-auction_go/internal/internal_error"
+	"os"
+	"sync"
+	"time"
 
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -19,12 +23,16 @@ type AuctionEntityMongo struct {
 	Timestamp   int64                           `bson:"timestamp"`
 }
 type AuctionRepository struct {
-	Collection *mongo.Collection
+	Collection         *mongo.Collection
+	auctionDuration    time.Duration
+	auctionStatusMutex *sync.Mutex
 }
 
-func NewAuctionRepository(database *mongo.Database) *AuctionRepository {
+func NewAuctionRepository(database *mongo.Database, auctionStatusMutex *sync.Mutex) *AuctionRepository {
 	return &AuctionRepository{
-		Collection: database.Collection("auctions"),
+		Collection:         database.Collection("auctions"),
+		auctionDuration:    getAuctionDuration(),
+		auctionStatusMutex: auctionStatusMutex,
 	}
 }
 
@@ -38,7 +46,8 @@ func (ar *AuctionRepository) CreateAuction(
 		Description: auctionEntity.Description,
 		Condition:   auctionEntity.Condition,
 		Status:      auctionEntity.Status,
-		Timestamp:   auctionEntity.Timestamp.Unix(),
+		// We add the duration to the current time to set the auction end time
+		Timestamp: auctionEntity.Timestamp.Add(ar.auctionDuration).Unix(),
 	}
 	_, err := ar.Collection.InsertOne(ctx, auctionEntityMongo)
 	if err != nil {
@@ -46,5 +55,27 @@ func (ar *AuctionRepository) CreateAuction(
 		return internal_error.NewInternalServerError("Error trying to insert auction")
 	}
 
+	go func() {
+		time.Sleep(ar.auctionDuration)
+		// We lock to make sure no readers are accessing the status while were updating it
+		ar.auctionStatusMutex.Lock()
+		_, err := ar.CloseAuction(ctx, auctionEntity.Id)
+		ar.auctionStatusMutex.Unlock()
+		if err != nil {
+			logger.Error("Error trying to close auction", err)
+		}
+		fmt.Println("Auction closed", auctionEntity.Id)
+	}()
+
 	return nil
+}
+
+func getAuctionDuration() time.Duration {
+	auctionInterval := os.Getenv("AUCTION_DURATION")
+	duration, err := time.ParseDuration(auctionInterval)
+	if err != nil {
+		return time.Minute * 6
+	}
+
+	return duration
 }
